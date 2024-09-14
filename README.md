@@ -3,8 +3,8 @@
 ## Deployment
 
 ```bash
-$ git clone https://github.com/lexhouk/goit-pyweb-hw-12.git
-$ cd goit-pyweb-hw-12
+$ git clone https://github.com/lexhouk/goit-pyweb-hw-13.git
+$ cd goit-pyweb-hw-13
 $ poetry install
 $ docker compose up -d
 $ alembic upgrade head

@@ -1,0 +1,10 @@
+services:
+  db:
+    image: postgres
+    container_name: lexhouk-hw-12
+    environment:
+      POSTGRES_DB: $DATABASE
+      POSTGRES_USER: $USER
+      POSTGRES_PASSWORD: $PASSWORD
+    ports:
+      - "${PORT}:5432"

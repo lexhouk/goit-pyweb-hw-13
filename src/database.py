@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import Date, ForeignKey, Integer, String, text
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, \
     async_sessionmaker, create_async_engine
@@ -105,6 +105,7 @@ class User(Base):
 
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     token: Mapped[str] = mapped_column(String(255), nullable=True)
+    verified: Mapped[bool] = mapped_column(Boolean(), default=False)
 
 
 async def init_db():

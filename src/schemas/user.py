@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 
 
-class Request(BaseModel):
+class UserRequest(BaseModel):
     username: EmailStr = Field(min_length=3, max_length=50)
     password: str = Field(min_length=6, max_length=8)
 

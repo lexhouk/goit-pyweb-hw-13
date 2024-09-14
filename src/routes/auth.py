@@ -1,12 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, \
+    Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, \
     OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
-from src.repository.users import create, update
-from src.services.auth import auth_service
-from src.schemas.user import Request, TokenSchema, Response
+from src.repository.users import create, update, verify
+from src.services.auth import auth_service, Token
+from src.services.email import send
+from src.schemas.user import TokenSchema, UserRequest
 
 
 router = APIRouter(prefix='/auth', tags=['Authorization'])
@@ -16,9 +18,11 @@ get_refresh_token = HTTPBearer()
 
 @router.post('/signup', status_code=status.HTTP_201_CREATED)
 async def signup(
-    body: Request,
+    body: UserRequest,
+    background: BackgroundTasks,
+    request: Request,
     db: AsyncSession = Depends(get_db)
-) -> Response:
+) -> dict:
     if await auth_service.get_user_by_email(body.username, db):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -27,7 +31,13 @@ async def signup(
 
     body.password = auth_service.get_password_hash(body.password)
 
-    return await create(body, db)
+    user = await create(body, db)
+
+    background.add_task(send, user.email, request.base_url)
+
+    message = 'User successfully created. Check your email for confirmation.'
+
+    return {'detail': message}
 
 
 @router.post('/login')
@@ -37,6 +47,9 @@ async def login(
 ) -> TokenSchema:
     if not (user := await auth_service.get_user_by_email(body.username, db)):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'Invalid email')
+
+    if not user.verified:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'Email not verified')
 
     if not auth_service.verify_password(body.password, user.password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'Invalid password')
@@ -51,7 +64,7 @@ async def refresh_token(
 ) -> TokenSchema:
     token = credentials.credentials
 
-    email = await auth_service.decode_refresh_token(token)
+    email = await auth_service.decode_token(token, Token.REFRESH)
 
     user = await auth_service.get_user_by_email(email, db)
 
@@ -64,3 +77,21 @@ async def refresh_token(
         )
 
     return await update(user, db)
+
+
+@router.get('/verify/{token}', status_code=status.HTTP_202_ACCEPTED)
+async def verify_email(token: str, db: AsyncSession = Depends(get_db)) -> dict:
+    email = await auth_service.decode_token(token)
+
+    if not (user := await auth_service.get_user_by_email(email, db)):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Verification error')
+
+    if user.verified:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            'Your email is already verified',
+        )
+
+    await verify(email, db)
+
+    return {'message': 'Email verified'}

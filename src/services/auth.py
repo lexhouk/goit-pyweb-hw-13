@@ -1,5 +1,5 @@
+from enum import Enum
 from datetime import datetime, timedelta, UTC
-from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -11,6 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db, User
 from src.schemas.user import Response
 from .environment import environment
+
+
+class Token(Enum):
+    ACCESS = 'access_token'
+    REFRESH = 'refresh_token'
 
 
 class Auth:
@@ -35,40 +40,37 @@ class Auth:
     async def create_token(
         self,
         email: str,
-        refresh_token: bool = False,
-        expires_delta: Optional[float] = None
+        token: Token = None,
+        expire: bool = False
     ) -> str:
         payload = {
             'sub': email,
-            'scope': 'refresh_token' if refresh_token else 'access_token',
             **{key: datetime.now(UTC) for key in ('iat', 'exp')},
         }
 
-        if expires_delta:
-            payload['exp'] += timedelta(seconds=expires_delta)
-        else:
-            payload['exp'] += timedelta(minutes=15)
+        if token:
+            payload['scope'] = token.value
+
+        payload['exp'] += timedelta(days=7) if expire \
+            else timedelta(minutes=15)
 
         return jwt.encode(payload, self.__SECRET, self.__ALGORITHM)
 
-    async def decode_refresh_token(self, refresh_token: str) -> str:
+    async def decode_token(self, token: str, type: Token = None) -> str:
         try:
-            payload = jwt.decode(
-                refresh_token,
-                self.__SECRET,
-                [self.__ALGORITHM],
-            )
+            payload = jwt.decode(token, self.__SECRET, [self.__ALGORITHM])
 
-            if payload['scope'] == 'refresh_token':
+            if not type or payload['scope'] == type.value:
                 return payload['sub']
+
             raise HTTPException(
                 status.HTTP_401_UNAUTHORIZED,
                 'Invalid scope for token',
             )
         except JWTError:
             raise HTTPException(
-                status.HTTP_401_UNAUTHORIZED,
-                'Could not validate credentials',
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                'Invalid token',
             )
 
     async def get_user_by_email(
@@ -92,13 +94,9 @@ class Auth:
         )
 
         try:
-            payload = jwt.decode(
-                token,
-                self.__SECRET,
-                [self.__ALGORITHM],
-            )
+            payload = jwt.decode(token, self.__SECRET, [self.__ALGORITHM])
 
-            if payload['scope'] != 'access_token' or payload['sub'] is None:
+            if payload['scope'] != Token.ACCESS.value or not payload['sub']:
                 raise credentials_exception
         except JWTError:
             raise credentials_exception

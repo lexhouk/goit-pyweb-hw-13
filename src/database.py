@@ -106,6 +106,7 @@ class User(Base):
     password: Mapped[str] = mapped_column(String(255), nullable=False)
     token: Mapped[str] = mapped_column(String(255), nullable=True)
     verified: Mapped[bool] = mapped_column(Boolean(), default=False)
+    avatar: Mapped[str] = mapped_column(String(255), nullable=True)
 
 
 async def init_db():

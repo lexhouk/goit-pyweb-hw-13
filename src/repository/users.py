@@ -48,3 +48,12 @@ async def verify(email: str, db: AsyncSession) -> None:
         user.verified = True
 
         await db.commit()
+
+
+async def avatar(email: str, url: str, db: AsyncSession) -> Response:
+    if (user := await auth_service.get_user_by_email(email, db)):
+        user.avatar = url
+
+        await db.commit()
+
+        return user

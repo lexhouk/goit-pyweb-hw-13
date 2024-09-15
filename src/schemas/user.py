@@ -8,7 +8,7 @@ class UserRequest(BaseModel):
 
 class Response(BaseModel):
     id: int = Field(default=1, ge=1)
-    username: EmailStr
+    email: EmailStr
 
     class Config:
         from_attributes = True

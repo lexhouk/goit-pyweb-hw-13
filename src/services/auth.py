@@ -19,11 +19,11 @@ class Token(Enum):
 
 
 class Auth:
-    __ALGORITHM = 'HS256'
     __pwd_context = CryptContext(['bcrypt'], deprecated='auto')
 
     def __init__(self) -> None:
-        self.__SECRET = environment('SECRET')
+        self.__ALGORITHM = environment('JWT_ALGORITHM')
+        self.__SECRET = environment('JWT_SECRET')
 
     def verify_password(
         self,

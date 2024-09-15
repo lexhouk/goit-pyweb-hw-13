@@ -10,15 +10,11 @@ from .environment import environment
 
 async def send(address: EmailStr, host: str) -> None:
     TOKEN = await auth_service.create_token(address, expire=True)
-    PREFIX = 'FASTAPIMAIL_'
 
     config = ConnectionConfig(
         MAIL_FROM_NAME='Contacts API',
         TEMPLATE_FOLDER=Path(__file__).parent / 'templates',
-        **{
-            key[len(PREFIX):]: value
-            for key, value in environment().items() if key.startswith(PREFIX)
-        },
+        **environment('FASTAPIMAIL', True),
     )
 
     try:

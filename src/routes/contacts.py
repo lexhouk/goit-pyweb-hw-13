@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi_limiter.depends import RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db, User
@@ -7,7 +8,11 @@ from src.schemas.contact import Request, Response, Responses
 from src.services.auth import auth_service
 
 
-router = APIRouter(prefix='/contacts', tags=['Contacts'])
+router = APIRouter(
+    prefix='/contacts',
+    tags=['Contacts'],
+    dependencies=[Depends(RateLimiter(3, minutes=1))],
+)
 
 
 @router.post('/', status_code=status.HTTP_201_CREATED)

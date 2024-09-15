@@ -15,7 +15,7 @@ async def init_engine() -> None:
     global engine
 
     try:
-        engine = create_async_engine(environment('URL'))
+        engine = create_async_engine(environment())
 
         async with engine.connect() as conn:
             await conn.execute(text('SELECT 1'))

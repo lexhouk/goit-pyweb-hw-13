@@ -17,14 +17,14 @@ from src.services.environment import environment
 
 @asynccontextmanager
 async def launch(app: FastAPI):
-    r = await InitRedis(
+    cache = await InitRedis(
         **environment('REDIS', True, True),
         db=0,
         encoding='utf-8',
         decode_responses=True,
     )
 
-    await FastAPILimiter.init(r)
+    await FastAPILimiter.init(cache)
 
     yield
 

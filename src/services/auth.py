@@ -1,10 +1,12 @@
 from enum import Enum
 from datetime import datetime, timedelta, UTC
+from pickle import dumps, loads
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+from redis import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +26,13 @@ class Auth:
     def __init__(self) -> None:
         self.__ALGORITHM = environment('JWT_ALGORITHM')
         self.__SECRET = environment('JWT_SECRET')
+
+        self.__cache = Redis(
+            **environment('REDIS', True, True),
+            db=0,
+            encoding='utf-8',
+            decode_responses=True,
+        )
 
     def verify_password(
         self,
@@ -101,8 +110,14 @@ class Auth:
         except JWTError:
             raise credentials_exception
 
-        if not (user := await self.get_user_by_email(payload['sub'], db)):
-            raise credentials_exception
+        if (user := self.__cache.get(name := f"user:{payload['sub']}")):
+            user = loads(user)
+        else:
+            if not (user := await self.get_user_by_email(payload['sub'], db)):
+                raise credentials_exception
+
+            self.__cache.set(name, dumps(user))
+            self.__cache.expire(name, 3600)  # 1 hour
 
         return user
 

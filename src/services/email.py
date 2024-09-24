@@ -8,7 +8,7 @@ from .auth import auth_service
 from .environment import environment
 
 
-async def send(address: EmailStr, host: str) -> None:
+async def send(address: EmailStr, subject: str, host: str, type: str) -> None:
     TOKEN = await auth_service.create_token(address, expire=True)
 
     config = ConnectionConfig(
@@ -19,12 +19,12 @@ async def send(address: EmailStr, host: str) -> None:
 
     try:
         message = MessageSchema(
-            subject='Confirm your email',
+            subject=subject,
             recipients=[address],
-            template_body={'url': f'{host}api/auth/verify/{TOKEN}'},
+            template_body={'url': f'{host}api/auth/{type}/{TOKEN}'},
             subtype=MessageType.html,
         )
 
-        await FastMail(config).send_message(message, 'email.html')
+        await FastMail(config).send_message(message, f'{type}-email.html')
     except ConnectionErrors as err:
         print(err)

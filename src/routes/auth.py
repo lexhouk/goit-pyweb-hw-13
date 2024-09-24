@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, \
     Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, \
     OAuth2PasswordRequestForm
+from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
@@ -31,9 +32,13 @@ async def signup(
 
     body.password = auth_service.get_password_hash(body.password)
 
-    user = await create(body, db)
-
-    background.add_task(send, user.email, request.base_url)
+    background.add_task(
+        send,
+        (await create(body, db)).email,
+        'Confirm your email',
+        request.base_url,
+        'verify',
+    )
 
     message = 'User successfully created. Check your email for confirmation.'
 
@@ -95,3 +100,43 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)) -> dict:
     await verify(email, db)
 
     return {'message': 'Email verified'}
+
+
+@router.post('/reset')
+async def request_reset_password(
+    email: EmailStr,
+    background: BackgroundTasks,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    if (user := await auth_service.get_user_by_email(email, db)):
+        background.add_task(
+            send,
+            user.email,
+            'Password reset',
+            request.base_url,
+            'reset',
+        )
+    else:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, 'Invalid email')
+
+    message = '''We have emailed you with instructions on how to reset your
+        password.'''
+
+    return {'detail': message}
+
+
+@router.get('/reset/{token}', status_code=status.HTTP_202_ACCEPTED)
+async def set_new_password(
+    token: str,
+    new_password: str,
+    db: AsyncSession = Depends(get_db)
+) -> TokenSchema | dict:
+    email = await auth_service.decode_token(token)
+
+    if (user := await auth_service.get_user_by_email(email, db)):
+        user.password = auth_service.get_password_hash(new_password)
+
+        return await update(user, db)
+
+    raise HTTPException(status.HTTP_400_BAD_REQUEST, 'Verification error')
